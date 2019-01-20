@@ -1,0 +1,312 @@
+---
+title: "Appendix"
+author: "Mianchun Lu"
+date: "December 3, 2018"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = F)
+```
+##Appendix 1 Data visualization
+"neighbourhood_group_cleansed"
+```{r}
+airbnb=read.csv("analysisData.csv",stringsAsFactors=F) 
+library(dplyr);library(ggplot2)
+airbnb$neighbourhood_group_cleansed=as.factor(airbnb$neighbourhood_group_cleansed)
+airbnb%>%group_by(neighbourhood_group_cleansed)%>%   
+  summarize(AveragePrice=mean(price,na.rm = T))%>%
+  ggplot(aes(x=levels(neighbourhood_group_cleansed),  
+             y=AveragePrice,size=AveragePrice,color=AveragePrice))+  
+  geom_point()+scale_color_continuous(low='white',high='red')+  
+  xlab('neighborhood_group_cleansed')+ylab('price')+coord_flip()
+```
+"cleaning_fee"
+```{r}
+airbnb%>%ggplot(aes(x=cleaning_fee,y=price,color=price))+geom_point()  
++scale_color_continuous(low='white',high='red')+xlab('cleaning_fee')   
++ylab('price')+coord_flip()
+```
+##Appendix 2 Codes for cleaning and preparing "scoring" data set
+```{r}
+scoringData=read.csv("scoringData.csv",stringsAsFactors=F)
+# Delete all the id and URL related variables
+scoringData$scrape_id=NULL;scoringData$host_id=NULL;
+scoringData$listing_url=NULL;scoringData$thumbnail_url=NULL;scoringData$medium_url=NULL;
+scoringData$picture_url=NULL;scoringData$xl_picture_url=NULL;scoringData$host_url=NULL;
+scoringData$host_thumbnail_url=NULL;scoringData$host_picture_url=NULL;
+# Delete all the host characteristics variables and data scraping records
+scoringData$last_scraped=NULL;scoringData$calendar_last_scraped=NULL;
+scoringData$host_location=NULL;scoringData$host_name=NULL;
+scoringData$host_acceptance_rate=NULL;scoringData$host_neighbourhood=NULL;
+scoringData$host_about=NULL;
+# Delete all the variables that have just one level
+scoringData$experiences_offered=NULL;scoringData$state=NULL;scoringData$country=NULL;
+scoringData$has_availability=NULL;scoringData$license=NULL;
+scoringData$requires_license=NULL;scoringData$country_code=NULL;
+# Delete variables that have more than half missing values/have too many unreadable message
+scoringData$neighborhood_overview=NULL;scoringData$street=NULL;
+scoringData$weekly_price=NULL;scoringData$monthly_price=NULL;
+scoringData$square_feet=NULL;scoringData$jurisdiction_names=NULL;
+scoringData$security_deposit=NULL;scoringData$city=NULL;
+# Delete variables that have strong correlation with other variables
+scoringData$first_review=NULL;scoringData$last_review=NULL;scoringData$zipcode=NULL;
+scoringData$market=NULL;scoringData$smart_location=NULL; 
+scoringData$neighbourhood_cleansed=NULL
+# no. of letters in name, summary, description and space
+scoringData$charCountName = nchar(scoringData$name);scoringData$name = NULL
+scoringData$charCountsummary = nchar(scoringData$summary);scoringData$summary=NULL
+scoringData$charCountDescription = nchar(scoringData$description); 
+scoringData$description=NULL
+scoringData$charCountSpace = nchar(scoringData$space);scoringData$space=NULL
+# to judge if it's blank(space/note/transit/access/interaction/house_rules)
+scoringData$noAccess = as.numeric(!scoringData$access=="") 
+scoringData$noAccess = factor(scoringData$noAccess,  
+                              labels=c('no access','contains access'))
+scoringData$noInteraction = as.numeric(!scoringData$interaction=="") 
+scoringData$noInteraction = factor(scoringData$noInteraction, 
+                                   labels=c('no interaction','contains interaction'))
+scoringData$noRules = as.numeric(!scoringData$house_rules=="") 
+scoringData$noRules = factor(scoringData$noRules,  
+                             labels=c('no rules','contains rules'))
+scoringData$notes=NULL;scoringData$transit=NULL;scoringData$access=NULL;
+scoringData$interaction=NULL;scoringData$house_rules=NULL
+write.csv(scoringData, "scoringData_final_01.csv",row.names = F)
+scoringData=read.csv("scoringData_final_01",stringsAsFactors=F)
+# loop for amenities
+for (i in 1:119) {
+  scoringData$i=as.factor(grepl(as.character(wordsData$words[i]), 
+                                scoringData$amenities,ignore.case = T))
+  a=as.character(wordsData$words[i])
+  scoringData=rename(scoringData,c(i=a))}
+scoringData$amenities=NULL
+# loop for host_verifications
+for (i in 1:26) {
+  scoringData$i=as.factor(grepl(as.character(wordsData2$words[i]),  
+                                scoringData$host_verifications,ignore.case = T))
+  a=as.character(wordsData2$words[i])
+  scoringData=rename(scoringData,c(i=a))}
+scoringData$host_verifications=NULL
+#time span & year
+library(lubridate)
+myformat <- "%m/%d/%Y"
+scoringData$history <- as.Date(scoringData$host_since)
+scoringData$present=as.Date(Sys.Date(),myformat) # present date
+scoringData$TimeDiff=scoringData$present-scoringData$history
+scoringData$year=year(scoringData$history)
+scoringData$host_since=NULL
+scoringData$history=NULL
+scoringData$present=NULL
+write.csv(scoringData, "scoringData_final_02.csv",row.names = F)
+```
+##Appendix 3 Codes for solving the extra two problems
+```{r}
+airbnb=read.csv("airbnb_final_02.csv")
+scoringData=read.csv("scoringData_final_02.csv")
+# The levels of "host_response_rate" should be exactly the same.
+library(dplyr)
+airbnb=airbnb%>%filter(host_response_rate!="22%" & host_response_rate!="14%" &  
+                         host_response_rate!="38%" & host_response_rate!="44%"&  
+                         host_response_rate!="29%"& host_response_rate!="51%" &  
+                         host_response_rate!="23%" & host_response_rate !="41%" &  
+                         host_response_rate!="24%" & host_response_rate!="61%"&  
+                         host_response_rate!="21%" & host_response_rate!="18%")
+# The levels of "neighbourhood" should be exactly the same.
+airbnb=airbnb%>%filter(neighbourhood!="City Island%" &   
+                         neighbourhood!="Silver Lake" & neighbourhood!="Clifton" &  
+                         neighbourhood!="Huguenot"& neighbourhood!="Morris Park"&  
+                         neighbourhood!="Country Club" & neighbourhood!="Woodlawn" &  
+                         neighbourhood!="Morris Heights" & neighbourhood!="Edenwald" &  
+                         neighbourhood!="New Springville"& neighbourhood!="Morris Park"&  
+                         neighbourhood!="Country Club" & neighbourhood!="Woodlawn")
+# I changed the extra levels in "scoring" dataset into an existing level.
+scoringData$neighbourhood[which(scoringData$neighbourhood=="Graniteville"|                                   scoringData$neighbourhood=="Castleton Corners")]="Westerleigh"
+scoringData$neighbourhood[  
+  which(scoringData$neighbourhood=="Marine Park")]="Midwood"
+# Using another method to check
+airbnb$new=airbnb$neighbourhood %in% levels(scoringData$neighbourhood)
+airbnb=airbnb%>%filter(new==1)
+airbnb$new=NULL
+# The levels of "property_type" should be exactly the same
+scoringData$property_type[which(scoringData$property_type=="Cottage"|  
+                                  scoringData$property_type=="Hut")]="Other"
+# Then, I deleted the observations with extra levels in "airbnb" dataset.
+airbnb$new=airbnb$property_type %in% levels(scoringData$property_type)
+airbnb=airbnb%>%filter(new==1)
+airbnb$new=NULL
+# The levels of "calendar_updated" should be exactly the same
+scoringData$calendar_updated[which(scoringData$calendar_updated=="60 months ago"|  
+                                     scoringData$calendar_updated=="46 months ago"|  
+                                     scoringData$calendar_updated=="51 months ago"|  
+                                     scoringData$calendar_updated=="47 months ago"|  
+                                     scoringData$calendar_updated=="45 months ago")  
+                             ]="43 months ago"
+# Then, I deleted the observations with extra levels in "airbnb" dataset.
+airbnb$new=airbnb$calendar_updated %in% levels(scoringData$calendar_updated)
+airbnb=airbnb%>%filter(new==1)
+airbnb$new=NULL
+# To handle the problem that some variables in "scoring" dataset have just one level
+airbnb$Other.pet.s.=NULL;airbnb$X.reviews=NULL;airbnb$X.phone=NULL;
+airbnb$X.jumio=NULL;airbnb$X.kba=NULL;airbnb$X.facebook=NULL;
+airbnb$X.government_id=NULL;airbnb$X.offline_government_id=NULL;
+airbnb$X.work_email=NULL;airbnb$X.selfie=NULL;airbnb$X.identity_manual=NULL;
+airbnb$X.google=NULL;airbnb$X.linkedin=NULL;airbnb$X.manual_offline=NULL;
+airbnb$X.amex=NULL;airbnb$X.manual_online=NULL;airbnb$X.sent_id=NULL;
+airbnb$X.weibo=NULL;airbnb$X.sesame_offline=NULL;airbnb$X.sesame=NULL;
+airbnb$X.photographer=NULL;airbnb$X.zhima_selfie=NULL;airbnb$Dog.s.=NULL;
+airbnb$Cat.s.=NULL
+scoringData$Other.pet.s.=NULL;scoringData$X.reviews=NULL;
+scoringData$X.phone=NULL;scoringData$X.jumio=NULL;scoringData$X.kba=NULL;
+scoringData$X.facebook=NULL;scoringData$X.government_id=NULL;
+scoringData$X.offline_government_id=NULL;scoringData$X.work_email=NULL;
+scoringData$X.selfie=NULL;scoringData$X.identity_manual=NULL;
+scoringData$X.google=NULL;scoringData$X.linkedin=NULL;
+scoringData$X.manual_offline=NULL;scoringData$X.amex=NULL;
+scoringData$X.manual_online=NULL;scoringData$X.sent_id=NULL;
+scoringData$X.weibo=NULL;scoringData$X.sesame_offline=NULL;
+scoringData$X.sesame=NULL;scoringData$X.photographer=NULL;
+scoringData$X.zhima_selfie=NULL;scoringData$Dog.s.=NULL;
+scoringData$Cat.s.=NULL
+# To convert variables from logic to factor
+names=names(airbnb)
+for (i in 56:176) {
+  airbnb[,i]=as.factor(airbnb[,i])
+}
+names=names(airbnb)
+for (i in 56:176) {
+  scoringData[,i]=as.factor(scoringData[,i])
+}
+write.csv(airbnb, "airbnb_final_03.csv",row.names = F)
+write.csv(scoringData, "scoringData_final_03.csv",row.names = F)
+```
+##Appendix 4 Code for the subset of "scoring"
+```{r}
+scoringData_selected=scoringData[,c('host_response_time',  
+'host_response_rate','host_is_superhost','host_identity_verified' , 
+'neighbourhood' , 'neighbourhood_group_cleansed', 'longitude' , 
+'property_type' , 'room_type' , 'accommodates' , 'bathrooms' , 
+'bedrooms' , 'cleaning_fee' , 'guests_included' , 'extra_people' , 
+'minimum_nights' , 'calendar_updated' , 'availability_30' , 'availability_90' ,
+'availability_365' , 'number_of_reviews' , 'review_scores_rating' ,
+'review_scores_cleanliness' , 'review_scores_location' , 'review_scores_value' ,
+'is_business_travel_ready' , 'cancellation_policy' , 'calculated_host_listings_count' ,
+'reviews_per_month' , 'charCountSpace' , 'Game.console' , 'Pocket.wifi' ,
+'Front.desk.doorperson' , 'Window.guards' , 'Suitable.for.events' , 
+'Indoor.fireplace' , 'Keypad' , 'Well.lit.path.to.entrance' , 'Doorman' ,
+'Wheelchair.accessible' , 'Gym' , 'Dishwasher' , 'Free.street.parking' , 
+'Free.parking.on.premises' , 'Safety.card', 'Cooking.basics' , 'Bed.linens' ,
+'translation.missing..en.hosting_amenity_49' , 'Elevator' , 'Cable.TV' , 
+'Buzzer.wireless.intercom' , 'Washer' , 'Family.kid.friendly' , 'TV' , 
+'Shampoo' , 'Air.conditioning' , 'reviews' , 'Pack.â..n.Play.travel.crib','price')]
+scoringData_selected=scoringData[,c('id','host_response_time',  
+'host_response_rate','host_is_superhost','host_identity_verified' , 
+'neighbourhood' , 'neighbourhood_group_cleansed', 'longitude' , 
+'property_type' , 'room_type' , 'accommodates' , 'bathrooms' , 
+'bedrooms' , 'cleaning_fee' , 'guests_included' , 'extra_people' , 
+'minimum_nights' , 'calendar_updated' , 'availability_30' , 'availability_90' ,
+'availability_365' , 'number_of_reviews' , 'review_scores_rating' ,
+'review_scores_cleanliness' , 'review_scores_location' , 'review_scores_value' ,
+'is_business_travel_ready' , 'cancellation_policy' , 'calculated_host_listings_count' ,
+'reviews_per_month' , 'charCountSpace' , 'Game.console' , 'Pocket.wifi' ,
+'Front.desk.doorperson' , 'Window.guards' , 'Suitable.for.events' , 
+'Indoor.fireplace' , 'Keypad' , 'Well.lit.path.to.entrance' , 'Doorman' ,
+'Wheelchair.accessible' , 'Gym' , 'Dishwasher' , 'Free.street.parking' , 
+'Free.parking.on.premises' , 'Safety.card', 'Cooking.basics' , 'Bed.linens' ,
+'translation.missing..en.hosting_amenity_49' , 'Elevator' , 'Cable.TV' , 
+'Buzzer.wireless.intercom' , 'Washer' , 'Family.kid.friendly' , 'TV' , 
+'Shampoo' , 'Air.conditioning' , 'reviews' , 'Pack.â..n.Play.travel.crib')]
+```
+##Appendix 5 Codes for trying different models
+```{r}
+set.seed(100)
+split = createDataPartition(y=airbnb_selected$price,p=0.7,list=F, groups=50)
+train = airbnb_selected[split,]
+test = airbnb_selected[-split,]
+# linear regression model
+model1 <- lm(price ~ , train)
+pred1 = predict(model1,newdata=test)
+rmse1 = sqrt(mean((pred1-test$price)^2)); rmse1
+# decision tree
+library(rpart)
+tree1 = rpart(price~.,data=train) # default method='anova' used
+pred2 = predict(tree1,newdata=test)
+rmse2 = sqrt(mean((pred2-test$price)^2)); rmse2
+# 10-fold Cross-Validation to tune tree complexity
+library(ISLR)
+library(caret)
+trControl = trainControl(method="cv",number = 10)
+tuneGrid = expand.grid(.cp = seq(0.001,0.1,0.001))
+set.seed(100)
+cvModel = train(price~.,data=train,
+                method="rpart", trControl=trControl,tuneGrid=tuneGrid)
+cvModel$bestTune
+treeCV = rpart(price~.,data=train,
+               control=rpart.control(cp = cvModel$bestTune))
+pred3 = predict(treeCV,newdata=test)
+rmse3 = sqrt(mean((pred3-test$price)^2)); rmse3
+# bagging
+library(randomForest)
+set.seed(100)
+bag = randomForest(price~.,data=train,mtry = 30,ntree=500)
+# This model ran a really long time(a day and a night) without showing any result.
+# random forest
+library(randomForest)
+set.seed(100)
+forest = randomForest(price~.,data=train,ntree = 500)
+# This model ran a really long time(a day and a night) without showing any result.
+# boost
+library(gbm)
+set.seed(100)
+boost = gbm(price~.,data=train,distribution="gaussian",
+            n.trees = 10000,interaction.depth = 3,shrinkage = 0.001)
+pred4 = predict(boost,newdata=test,n.trees = 10000)
+rmse4 = sqrt(mean((pred4-test$price)^2)); rmse4
+set.seed(100)
+boost2 = gbm(price~.,data=train,distribution="gaussian",
+            n.trees = 100000,interaction.depth = 3,shrinkage = 0.001)
+pred5 = predict(boost2,newdata=test,n.trees = 100000)
+rmse5 = sqrt(mean((pred5-test$price)^2)); rmse5
+set.seed(100)
+boost3 = gbm(price~.,data=train,distribution="gaussian",
+            n.trees = 10000,interaction.depth = 5,shrinkage = 0.001)
+pred6 = predict(boost3,newdata=test,n.trees = 10000)
+rmse6 = sqrt(mean((pred6-test$price)^2)); rmse6
+set.seed(100)
+boost4 = gbm(price~.,data=train,distribution="gaussian",
+            n.trees = 10000,interaction.depth = 11,shrinkage = 0.001)
+pred7 = predict(boost4,newdata=test,n.trees = 10000)
+rmse7 = sqrt(mean((pred7-test$price)^2)); rmse7
+# cross validation with boost
+library(xgboost);library(readr);library(stringr);library(caret);
+library(car);library(dplyr)
+xgb_trcontrol = trainControl(
+  method = "cv",
+  number = 5,  
+  allowParallel = TRUE,
+  verboseIter = FALSE,
+  returnData = FALSE)
+xgbGrid = expand.grid(nrounds = c(100,200), 
+                       max_depth = c(10, 15, 20, 25),
+                       colsample_bytree = seq(0.5, 0.9, length.out = 5),
+                       eta = 0.1,
+                       gamma=0,
+                       min_child_weight = 1,
+                       subsample = 1)
+set.seed(100) 
+xgb_model = train(price~.,data=train,
+  trControl = xgb_trcontrol,
+  tuneGrid = xgbGrid,
+  method = "xgbTree")
+pred8 = predict(xgb_model,newdata=test)
+rmse8 = sqrt(mean((pred8-test$price)^2)); rmse9
+# boost model cannot deal with NAs by itself.
+library(caret)
+scoringData_selected = predict(preProcess(scoringData_selected,  
+                                          method = 'medianImpute'),  
+                               newdata = scoringData_selected)
+pred = predict(xgb_model,newdata=scoringData_selected)
+submission= data.frame(id = scoringData_selected$id, price = pred)
+write.csv(submission, 'submission.csv',row.names = F)
+```

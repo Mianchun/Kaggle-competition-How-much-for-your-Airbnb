@@ -1,0 +1,188 @@
+---
+title: "Kaggle Competition by Mianchun Lu"
+author: "Mianchun Lu"
+date: "December 1, 2018"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = F)
+```
+##Part 1 Brief Summary
+The aim of this project is to predict rental price with renter information, property characteristics and reviews. My predicting process had four main steps. Firstly, I explored the raw data to build a basic understanding of the data. Secondly, I cleaned and prepared the data. My logic behind this step was deleting the variables I didn't need and then generating new variables based on the original ones. I also dealt with the missing values in this step. Thirdly, I did feather selection with Lasso model and selected 58 variables to do the further analysis and prediction. Feather selection can help me handle the over-fitting problem. The fourth step was to build the predicting model. After trying models that I learnt in class, such as linear regression model, decision tree model, cross validation with boost, etc., I finally used the xgboost model, which was more accurate and faster than others, to predict the rental price.   
+Reviewing the whole process of my analyzing and predicting, I realized which part I did right and which part I could improve in the future. I think this project is really helpful for me and I have learnt a lot about data analysis and machine learning. 
+
+##Part 2 Data Exploration
+The analysis data has 29,143 rows and 96 columns. The dependent variable is in numeric class, and the independent variables includes character, factor variables, numeric variables and date. All the valuable independent variables could be divided into five categories.  
+Location information: neighborhood, neighborhood group, etc.  
+House characteristics: year, amenity, room type, beds, etc.  
+Reviews: number of reviews, review scores, etc.  
+Service related: cancellation policy, cleaning fee, etc.  
+Availability: availability_30, etc.  
+After a pre-exploration of data in Excel, I imported it into RStudio for further and deeper exploration. It was important to make sure that all the character variables wouldn't be transferred into factor in RStudio, so that I could manipulate them in the way I want. I also selected several variables, such as "neighbourhood_group_cleansed" and "cleaning_fee" for visualization, which are presented in Appendix 1.
+```{r}
+airbnb=read.csv("analysisData.csv",stringsAsFactors=F) 
+str(airbnb)
+```
+##Part 3 Data Preparing and Cleaning
+In order to find out the truth behind the data, it was needed to clean and prepare the data before the data modeling. So, my next step was to delete irrelevant variables, variables that have just one level which wouldn't have influence on the results, and variables that have more than half missing values which would cause serious noise to the results.
+```{r}
+# All the id and URL related variables
+airbnb$id=NULL;airbnb$scrape_id=NULL;airbnb$host_id=NULL
+airbnb$listing_url=NULL;airbnb$thumbnail_url=NULL;airbnb$medium_url=NULL;
+airbnb$picture_url=NULL;airbnb$xl_picture_url=NULL;airbnb$host_url=NULL;
+airbnb$host_thumbnail_url=NULL;airbnb$host_picture_url=NULL
+# All the host characteristics variables and data scraping records
+airbnb$last_scraped=NULL;airbnb$calendar_last_scraped=NULL
+airbnb$host_name=NULL;airbnb$host_location=NULL;airbnb$host_acceptance_rate=NULL;
+airbnb$host_neighbourhood=NULL;airbnb$host_about=NULL
+# All the variables that have just one level
+airbnb$experiences_offered=NULL;airbnb$state=NULL;airbnb$country=NULL;a
+irbnb$has_availability=NULL;airbnb$license=NULL;airbnb$requires_license=NULL;
+airbnb$country_code=NULL
+# Variables that have more than half missing values/too many unreadable message
+airbnb$neighborhood_overview=NULL;airbnb$street=NULL;airbnb$weekly_price=NULL;
+airbnb$monthly_price=NULL;airbnb$square_feet=NULL;airbnb$jurisdiction_names=NULL;
+airbnb$security_deposit=NULL;airbnb$city=NULL
+# Variables that have strong correlation with other variables
+airbnb$first_review=NULL;airbnb$last_review=NULL;airbnb$zipcode=NULL;
+airbnb$market=NULL;airbnb$smart_location=NULL;airbnb$neighbourhood_cleansed=NULL
+```
+Then, I started to deal with the character variables. For some variables that includes long sentences, such as "name", "summary","description", etc., I counted the number of the letters, created new variables, and deleted the original ones. For variables that contains many NAs, such as space, note, etc., I added new variables to judge the status of each observation instead of counting the letters. 
+```{r}
+# no of letters in name, summary, description and space
+airbnb$charCountName = nchar(airbnb$name);airbnb$name = NULL
+airbnb$charCountsummary = nchar(airbnb$summary);airbnb$summary=NULL
+airbnb$charCountDescription = nchar(airbnb$description);airbnb$description=NULL
+airbnb$charCountSpace = nchar(airbnb$space);airbnb$space=NULL
+# to judge if it's blank(space/note/transit/access/interaction/house_rules)
+airbnb$noAccess = as.numeric(!airbnb$access=="");airbnb$noAccess =  
+  factor(airbnb$noAccess,labels=c('no access','contains access'))
+airbnb$noInteraction = as.numeric(!airbnb$interaction=="");
+airbnb$noInteraction = factor(airbnb$noInteraction,  
+                              labels=c('no interaction','contains interaction'))
+airbnb$noRules = as.numeric(!airbnb$house_rules=="");airbnb$noRules =  
+  factor(airbnb$noRules,labels=c('no rules','contains rules'))
+airbnb$notes=NULL;airbnb$transit=NULL;airbnb$access=NULL;airbnb$interaction=NULL;
+airbnb$house_rules=NULL
+write.csv(airbnb, "airbnb_final_01.csv",row.names = F)
+```
+After conducting the steps above, there were only two character variables left, "amenity" and "host_verification". Based on my own experience, the amenities in the house can significantly influence the price, so I had to transfer this variable into several factor variables and test my guess. I searched on the Internet, and finally applied word cloud and for loop to do this. I also applied the same method to transfer the "host_verification". An important point for this step was to remove all the special marks in data set, such as '{', '}' and '"'. I firstly tried to remove them in R, but the results were not clean enough. I think this was because the way R recognizes special marks is different. So, I had to do the replacement in Excel, and imported the data without special marks to RStudio before I applied the word cloud and for loop. Then, the loops helped me to get 119 more variables for "amenities", and 26 more variables for "host_verification". The original "amenities" and "host_verification" were deleted after that.
+```{r}
+# Using Excel and importing the dataset again
+airbnb=read.csv("airbnb_final_01.csv",stringsAsFactors=F)
+# wordcloud and loop for amenities
+words <- lapply(airbnb$amenities,strsplit,",")
+wordsNum <- table(unlist(words))
+wordsNum <- sort(wordsNum)
+wordsData <- data.frame(words =names(wordsNum), freq = wordsNum)
+library(plyr)
+for (i in 1:119) {
+  airbnb$i=as.factor(grepl(as.character(wordsData$words[i]),  
+                           airbnb$amenities,ignore.case = T))
+  a=as.character(wordsData$words[i])
+  airbnb=rename(airbnb,c(i=a))
+}
+airbnb$amenities=NULL
+# wordcloud and loop for host_verifications
+words2 <- lapply(airbnb$host_verifications,strsplit,",")
+wordsNum2 <- table(unlist(words2))
+wordsNum2 <- sort(wordsNum2)
+wordsData2 <- data.frame(words =names(wordsNum2), freq = wordsNum2)
+wordsData2
+for (i in 1:26) {
+  airbnb$i=as.factor(grepl(as.character(wordsData2$words[i]),  
+                           airbnb$host_verifications,ignore.case = T))
+  a=as.character(wordsData2$words[i])
+  airbnb=rename(airbnb,c(i=a))
+}
+airbnb$host_verifications=NULL
+```
+As for the time-related variable "host_since", I transferred it into a factor variable "year" which has levels of different years, and added a numeric variable "TimeDiff" to show the time span. The codes I used are shown as follows.
+```{r}
+#time span & year
+library(lubridate)
+myformat = "%m/%d/%Y"
+airbnb$history = as.Date(airbnb$host_since) 
+# This code can work sometimes. But sometimes I need to re-import the data
+airbnb$present=as.Date(Sys.Date(),myformat) # present date
+airbnb$TimeDiff=airbnb$present-airbnb$history # the time span between host_since and now
+airbnb$year=year(airbnb$history) # only show the year of "host_since"
+airbnb$history=NULL
+airbnb$present=NULL
+airbnb$host_since=NULL
+```
+Next, I started to deal with the missing value. Some models, such as Lasso and Decision Tree, cannot do the analysis with NAs. In my dataset, there were NAs in "beds" and "cleaning_fee". The number of rows having NA was about 1800. I thought this number was small compared to 29142, which was the number of all rows. Thus, I deleted all the rows with NA, and exported this data set as cleaned one.
+```{r}
+# delete rows
+airbnb=airbnb[!is.na(airbnb$beds),]
+airbnb= airbnb[!is.na(airbnb$cleaning_fee),]
+write.csv(airbnb, "airbnb_final_02.csv",row.names = F)
+```
+The cleaning and preparing process for "scoring" dataset was similar to the process for "airbnb" dataset, which I discussed before. The only two differences were that I should keep the "id" in "scoring" dataset for submission, and I couldn't delete the rows with NA in "scoring" dataset. The detailed codes for cleaning and preparing of "scoring" dataset were placed in appendix 2.  
+When I re-imported the cleaned version of "airbnb" and "scoringData", new problems appeared. Firstly, I realized that the levels of factor variables, such as "host_response_rate", "neighbourhood", "property_type", etc. in the "airbnb" dataset and "scoring" dataset should be exactly the same, or the decision tree model would not work. So, I used Excel to find out the levels that appeared in both datasets. If there were extra levels in "airbnb" dataset, I would delete the observations with those levels because the extra levels were not helpful for the predicting of "scoring" dataset. And if there were extra levels in "scoring" dataset, I would find reasonable reference and make some adjustment. Another problem was that some variables in "scoring" dataset have just one level, which was caused by my previous conduction of adding new variables into the datasets. To handle this problem, I deleted these variables in both datasets. The detailed codes for solving these two problems were shown in appendix 3.
+
+##Part 4 Feather Selection
+After the data cleaning and preparing, I started to build the model. There were more than 150 variables in my dataset. If I used all of them to predict the price, there should be serious over-fitting problem. Therefore, I applied Lasso model with cross validation to select variables that could significantly influence the dependent variable. The result of Lasso left me 58 independent variables. I built a new dataset based on the result. The code for the subsets were shown in appendix 4.
+```{r}
+library(glmnet)
+x = model.matrix(price~.-1,data=airbnb)
+y = airbnb$price
+cv.lasso = cv.glmnet(x,y,alpha=1)
+coef(cv.lasso);preds <- coef(cv.lasso)
+non_zero_preds = which(preds[,1] != 0.0)
+pred_names = names(non_zero_preds[2:length(non_zero_preds)])
+preds_string = paste(pred_names, collapse=" + ")
+lm_formula = paste0("price ~ ", preds_string)
+```
+
+##Part 5 Modeling
+The first thing I did in this step was to split my data into train and test set. Then, I tried many methods to build the model for data predicting, such as linear regression, decision tree, cross validation with decision tree, bagging, random forest, boost, and cross validation with boost. I calculated the rmse of test dataset to compare the performance of these models. The codes for these models are shown in appendix 5. The model I used at the end was the xgboost model. I found this model and function on the Internet, and it was faster and more accurate than other models I tried. The parameters in this function had great influence on the results. The following model was the best on I have tried.
+```{r}
+region = model.matrix(~neighbourhood-1, airbnb_selected)
+airbnb2 = cbind(airbnb_selected, region)
+region_group = model.matrix(~neighbourhood_group_cleansed-1, airbnb_selected)
+airbnb2 = cbind(airbnb2, region_group)
+airbnb2$neighbourhood=NULL
+airbnb2$neighbourhood_group_cleansed=NULL
+airbnb2=airbnb2[,-59]
+region0 = model.matrix(~neighbourhood-1, scoringData_selected)
+scoringData2=cbind(scoringData_selected,region0)
+region_group0 = model.matrix(~neighbourhood_group_cleansed-1, scoringData_selected)
+scoringData2 = cbind(scoringData2, region_group0)
+scoringData2$neighbourhood=NULL
+scoringData2$neighbourhood_group_cleansed=NULL
+scoringData2=scoringData2[,-1]
+for (i in 1:228) {
+  airbnb2[,i]=as.numeric(airbnb2[,i])}
+for (i in 1:228) {
+  scoringData2[,i]=as.numeric(scoringData2[,i])}
+xgb_airbnb=as.matrix(airbnb2)
+# parameter list
+params = list(
+  eta = 0.01,
+  max_depth = 5,
+  min_child_weight = 7,
+  colsample_bytree = 1)
+library(xgboost)
+xgb.fit.final = xgboost(
+  params = params,
+  data = xgb_airbnb,
+  label = airbnb$price,
+  nrounds = 3000,
+  subsample=0.55,
+  objective = "reg:linear")
+# importance matrix
+realnames = dimnames(data.matrix(xgb_airbnb)[[2]])
+importance_matrix00 = xgb.importance(realnames, model = xgb.fit.final)
+# for prediction
+variables1=names(airbnb2)
+scoringData2=scoringData2[,variables1]
+xgb_scoring=as.matrix(scoringData2)
+pred50= predict(xgb.fit.final,newdata=xgb_scoring)
+submission50= data.frame(id = scoringData_selected$id, price = pred50)
+write.csv(submission50, 'submission50.csv',row.names = F)
+```
+##Part 6 Discussion
+Reviewing the whole process of my analysis and predicting, I realized which step I did right, and which part I could improve.  
+For the steps I did right, firstly, I did feather selection to avoid the over-fitting problem. My experience in this project also showed that the results of the prediction could be better after the feather selection. Secondly, I transferred the character variable "Amenity" to 119 factor variables using word cloud and for loop. Some among these variables were proved to be significant in my final model. Thirdly, I used Excel to help with data cleaning, which was convenient and quick. Fourthly, I applied all cleaning, transforming, and preparing steps on both the analysis and scoring data and made sure the levels in the factor variables are same.  
+As for the missteps and further improvement, firstly, manipulating the two datasets for data cleaning could waste much time. Next time, I should combine the two datasets together firstly to prepare them, and then separate them for modeling and predicting. Secondly, I need to pay more attention to version saving. Leaving records of all the conduction in RStudio could be helpful for further model testing. Thirdly, I am thinking about not deleting NAs or filling the blanks, but creating a new level for missing value to keep the characteristics of original data. I want to try this method and see if the results can be better.
